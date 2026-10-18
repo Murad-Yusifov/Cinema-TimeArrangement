@@ -356,6 +356,32 @@
       font-size: 20px;
     }
 
+    .next-session-card {
+      padding: 20px;
+      border: 2px solid var(--green);
+      border-radius: 12px;
+      background: #fbfffc;
+    }
+
+    .next-session-card.status-orange {
+      border-color: #d97706;
+      background: #fff7e8;
+    }
+
+    .next-session-main {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .next-session-room { font-size: 28px; font-weight: 800; }
+    .next-session-time { font-size: 21px; font-weight: 700; }
+    .next-session-countdown { margin-top: 10px; font-size: 24px; font-weight: 800; }
+    .next-session-card.status-green .next-session-countdown { color: var(--green); }
+    .next-session-card.status-orange .next-session-countdown { color: var(--orange); }
+
     .plain-output {
       width: 100%;
       min-height: 100px;
@@ -510,6 +536,15 @@
           <span class="dot dot-gray"></span>
           Session ended
         </div>
+      </div>
+    </section>
+
+    <section class="panel" id="nextSessionPanel" aria-live="polite">
+      <h2>Next session ending</h2>
+      <p class="help-text">The next session due to end is highlighted here. A warning appears when it is 5 minutes from ending.</p>
+      <div id="nextSessionView" class="empty-state">
+        <strong>No upcoming session</strong>
+        Upload your Excel schedule to see the next session ending.
       </div>
     </section>
 
@@ -744,6 +779,48 @@
       };
     }
 
+    function getSessionEndDateTime(session, now = new Date()) {
+      const target = new Date(now);
+      target.setHours(session.hour, session.minute, 0, 0);
+
+      // Use the same overnight boundary as the existing countdown logic.
+      if (now.getHours() < 10 && session.hour >= 10) {
+        target.setDate(target.getDate() - 1);
+      } else if (now.getHours() >= 10 && session.hour < 10) {
+        target.setDate(target.getDate() + 1);
+      }
+      return target;
+    }
+
+    function renderNextSession(now = new Date()) {
+      const view = document.getElementById("nextSessionView");
+      const upcoming = currentSchedule
+        .map(session => ({ ...session, endDateTime: getSessionEndDateTime(session, now) }))
+        .filter(session => session.endDateTime.getTime() > now.getTime())
+        .sort((a, b) => a.endDateTime - b.endDateTime || a.room - b.room);
+
+      if (upcoming.length === 0) {
+        view.className = "empty-state";
+        view.innerHTML = `<strong>No upcoming session</strong>All sessions in the loaded schedule have ended for the current schedule day.`;
+        return;
+      }
+
+      const next = upcoming[0];
+      const minutes = Math.ceil((next.endDateTime.getTime() - now.getTime()) / 60000);
+      const warning = minutes <= 5;
+      view.className = `next-session-card ${warning ? "status-orange" : "status-green"}`;
+      view.innerHTML = `
+        <div class="next-session-main">
+          <div>
+            <div class="next-session-room">Room ${next.room}</div>
+            <div class="room-label">Next session to end</div>
+          </div>
+          <div class="next-session-time">Ends at ${String(next.hour).padStart(2, "0")}:${String(next.minute).padStart(2, "0")}</div>
+        </div>
+        <div class="next-session-countdown">${warning ? "⚠ " : ""}${warning ? "Ending" : "Ends"} in ${minutes} minute${minutes === 1 ? "" : "s"}</div>
+      `;
+    }
+
     function superscriptDigits(value) {
       const map = {
         "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
@@ -772,6 +849,7 @@
         textOutput.textContent = "No schedule available.";
         sessionCount.textContent = "0 sessions";
         copyButton.disabled = true;
+        renderNextSession();
         return;
       }
 
@@ -834,6 +912,8 @@
           minute: "2-digit",
           hour12: false
         });
+
+      renderNextSession(now);
 
       document.querySelectorAll(".room-card").forEach(card => {
         const session = {
