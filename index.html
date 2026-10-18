@@ -8,14 +8,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-  <!-- MathJax displays mathematical expressions -->
-  <script>
-    window.MathJax = {
-      tex: { inlineMath: [['\\(', '\\)']] }
-    };
-  </script>
-  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -23,68 +15,67 @@
     }
 
     input, button {
-      margin: 8px 0;
       padding: 8px;
-    }
-
-    table {
-      border-collapse: collapse;
-      margin-top: 20px;
-      width: 100%;
-    }
-
-    th, td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: left;
+      margin: 5px 3px 5px 0;
     }
 
     pre {
       white-space: pre-wrap;
-      line-height: 1.7;
+      line-height: 1.8;
+      font-size: 18px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: left;
+    }
+
+    .room-time {
+      white-space: nowrap;
+      margin-right: 10px;
+    }
+
+    sup {
+      font-size: 0.7em;
+      vertical-align: super;
     }
   </style>
 </head>
-<body>
 
+<body>
   <h2>Cinema Schedule Converter</h2>
 
   <input type="file" id="fileInput" accept=".xls,.xlsx">
-  <button onclick="convertSchedule()">Convert Schedule</button>
-  <button onclick="copyResult()">Copy Schedule</button>
+  <button id="convertButton">Convert</button>
+  <button id="copyButton">Copy Schedule</button>
+  <button id="clearButton">Clear Saved Schedule</button>
 
-  <h3>Schedule Output</h3>
-  <pre id="output">Upload an Excel file first.</pre>
+  <p id="status">Upload your Excel file.</p>
 
+  <h3>Converted Schedule</h3>
+  <pre id="output">No schedule loaded.</pre>
+
+  <h3>Formatted Table</h3>
   <table>
     <thead>
       <tr>
         <th>Hour</th>
-        <th>Room End Times</th>
+        <th>Room and End Minute</th>
       </tr>
     </thead>
     <tbody id="tableBody"></tbody>
   </table>
 
-  <hr>
-
-  <h3>Power Expression Converter</h3>
-
-  <label>
-    Base:
-    <input type="number" id="base" value="3">
-  </label>
-
-  <label>
-    Exponent:
-    <input type="number" id="exponent" value="3" min="0" max="100">
-  </label>
-
-  <button onclick="convertPower()">Calculate</button>
-
-  <p id="powerOutput"></p>
-
   <script>
+    const STORAGE_KEY = "cinemaScheduleV2";
+
     const roomNumbers = {
       "platinum": 1,
       "coca-cola": 2,
@@ -94,185 +85,243 @@
       "dolby atmos": 9
     };
 
+    // Unicode superscript digits for plain-text output.
+    const superscriptDigits = {
+      "0": "⁰",
+      "1": "¹",
+      "2": "²",
+      "3": "³",
+      "4": "⁴",
+      "5": "⁵",
+      "6": "⁶",
+      "7": "⁷",
+      "8": "⁸",
+      "9": "⁹"
+    };
+
+    function toSuperscript(number) {
+      return String(number)
+        .split("")
+        .map(digit => superscriptDigits[digit])
+        .join("");
+    }
+
+    const fileInput = document.getElementById("fileInput");
+    const output = document.getElementById("output");
+    const tableBody = document.getElementById("tableBody");
+    const status = document.getElementById("status");
+
+    const hours = [
+      ...Array.from({ length: 14 }, (_, i) => i + 10),
+      ...Array.from({ length: 10 }, (_, i) => i)
+    ];
+
+    document.getElementById("convertButton")
+      .addEventListener("click", convertSchedule);
+
+    document.getElementById("copyButton")
+      .addEventListener("click", copyResult);
+
+    document.getElementById("clearButton")
+      .addEventListener("click", clearSavedSchedule);
+
+    // Restore saved data when the page opens.
+    restoreSchedule();
+
+    function createEmptySchedule() {
+      const schedule = {};
+
+      for (let hour = 0; hour < 24; hour++) {
+        schedule[hour] = [];
+      }
+
+      return schedule;
+    }
+
     async function convertSchedule() {
-      const file = document.getElementById("fileInput").files[0];
-      const output = document.getElementById("output");
-      const tableBody = document.getElementById("tableBody");
+      const file = fileInput.files[0];
 
       if (!file) {
-        output.textContent = "Please select an Excel file.";
+        status.textContent = "Please select an Excel file.";
         return;
       }
 
       try {
         const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: "array" });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
-        const rows = XLSX.utils.sheet_to_json(sheet, {
-          header: 1,
-          defval: "",
-          raw: false
+        const workbook = XLSX.read(buffer, {
+          type: "array"
         });
 
-        const schedule = {};
+        const schedule = createEmptySchedule();
 
-        for (let hour = 0; hour < 24; hour++) {
-          schedule[hour] = [];
-        }
+        for (const sheetName of workbook.SheetNames) {
+          const sheet = workbook.Sheets[sheetName];
 
-        let currentRoom = null;
-        let endTimeColumn = -1;
-
-        for (const row of rows) {
-          const cells = row.map(value =>
-            String(value ?? "").trim()
-          );
-
-          // Identify a room section.
-          const roomHeader = cells.find(cell =>
-            /зал\s*:/i.test(cell)
-          );
-
-          if (roomHeader) {
-            const name = roomHeader
-              .replace(/^.*?зал\s*:\s*/i, "")
-              .split(",")[0]
-              .trim()
-              .toLowerCase();
-
-            currentRoom = roomNumbers[name] ?? null;
-            endTimeColumn = -1;
-            continue;
-          }
-
-          // Find the end-time column.
-          const headerIndex = cells.findIndex(cell =>
-            /конец\s+сеанса/i.test(cell)
-          );
-
-          if (headerIndex !== -1) {
-            endTimeColumn = headerIndex;
-            continue;
-          }
-
-          if (currentRoom === null || endTimeColumn === -1) {
-            continue;
-          }
-
-          const value = cells[endTimeColumn];
-
-          // Read end times such as 12:25 or 01:30.
-          const match = value.match(/^(\d{1,2}):(\d{2})$/);
-
-          if (!match) continue;
-
-          const hour = Number(match[1]);
-          const minute = Number(match[2]);
-
-          if (hour > 23 || minute > 59) continue;
-
-          schedule[hour].push({
-            room: currentRoom,
-            minute
+          const rows = XLSX.utils.sheet_to_json(sheet, {
+            header: 1,
+            defval: "",
+            raw: false
           });
+
+          let currentRoom = null;
+          let endTimeColumn = -1;
+
+          for (const row of rows) {
+            const cells = row.map(value =>
+              String(value ?? "").trim()
+            );
+
+            // Identify the cinema room.
+            const roomHeader = cells.find(cell =>
+              /зал\s*:/i.test(cell)
+            );
+
+            if (roomHeader) {
+              const name = roomHeader
+                .replace(/^.*?зал\s*:\s*/i, "")
+                .split(",")[0]
+                .trim()
+                .toLowerCase();
+
+              currentRoom = roomNumbers[name] ?? null;
+              endTimeColumn = -1;
+              continue;
+            }
+
+            // Find the session end-time column.
+            const headerIndex = cells.findIndex(cell =>
+              /конец\s+сеанса/i.test(cell)
+            );
+
+            if (headerIndex !== -1) {
+              endTimeColumn = headerIndex;
+              continue;
+            }
+
+            if (currentRoom === null || endTimeColumn === -1) {
+              continue;
+            }
+
+            const value = cells[endTimeColumn];
+            const match = value.match(/^(\d{1,2}):(\d{2})$/);
+
+            if (!match) continue;
+
+            const hour = Number(match[1]);
+            const minute = Number(match[2]);
+
+            if (hour > 23 || minute > 59) continue;
+
+            schedule[hour].push({
+              room: currentRoom,
+              minute
+            });
+          }
         }
 
         // Sort sessions by ending minute.
-        for (const hour in schedule) {
+        for (const hour of Object.keys(schedule)) {
           schedule[hour].sort((a, b) =>
             a.minute - b.minute || a.room - b.room
           );
         }
 
-        // Start at 10:00, continue through midnight.
-        const hours = [
-          ...Array.from({ length: 14 }, (_, i) => i + 10),
-          ...Array.from({ length: 10 }, (_, i) => i)
-        ];
-
         const lines = hours.map(hour => {
           const entries = schedule[hour].map(item =>
-            `${item.room}^${String(item.minute).padStart(2, "0")}`
+            `${toSuperscript(item.room)}${String(item.minute).padStart(2, "0")}`
           );
 
           return `${hour}-${entries.join("-")}`;
         });
 
-        output.textContent = lines.join("\n");
-        tableBody.replaceChildren();
+        const savedData = {
+          schedule,
+          output: lines.join("\n"),
+          fileName: file.name
+        };
 
-        for (const hour of hours) {
-          const tr = document.createElement("tr");
-          const hourCell = document.createElement("td");
-          const entriesCell = document.createElement("td");
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify(savedData)
+        );
 
-          hourCell.textContent = hour;
-          entriesCell.textContent = schedule[hour]
-            .map(item =>
-              `${item.room}^${String(item.minute).padStart(2, "0")}`
-            )
-            .join(" - ");
-
-          tr.append(hourCell, entriesCell);
-          tableBody.appendChild(tr);
-        }
+        displaySchedule(savedData);
+        status.textContent = "Schedule converted and saved.";
 
       } catch (error) {
-        output.textContent = "Error: " + error.message;
+        status.textContent = "Error: " + error.message;
       }
     }
 
+    function displaySchedule(data) {
+      output.textContent = data.output;
+      tableBody.replaceChildren();
+
+      for (const hour of hours) {
+        const tr = document.createElement("tr");
+        const hourCell = document.createElement("td");
+        const entriesCell = document.createElement("td");
+
+        hourCell.textContent = hour;
+
+       for (const item of data.schedule[hour]) {
+  const span = document.createElement("span");
+  span.className = "room-time fraction";
+
+  const minute = document.createElement("span");
+  minute.className = "minute";
+  minute.textContent = String(item.minute).padStart(2, "0");
+
+  const room = document.createElement("span");
+  room.className = "room";
+  room.textContent = item.room;
+
+  span.append(minute, room);
+  entriesCell.appendChild(span);
+}
     async function copyResult() {
-      const text = document.getElementById("output").textContent;
-
       try {
-        await navigator.clipboard.writeText(text);
+        await navigator.clipboard.writeText(output.textContent);
+        status.textContent = "Schedule copied.";
       } catch {
-        alert("Copy failed. Please select and copy the output manually.");
+        status.textContent =
+          "Copy failed. Select the output and copy it manually.";
       }
     }
 
-    // Convert a power into its multiplication form.
-    function convertPower() {
-      const baseInput = document.getElementById("base").value;
-      const exponentInput = document.getElementById("exponent").value;
-      const output = document.getElementById("powerOutput");
+    function restoreSchedule() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
 
-      if (baseInput === "" || exponentInput === "") {
-        output.textContent = "Enter a base and an exponent.";
-        return;
-      }
+        if (!saved) return;
 
-      const base = Number(baseInput);
-      const exponent = Number(exponentInput);
+        const data = JSON.parse(saved);
 
-      if (
-        !Number.isFinite(base) ||
-        !Number.isInteger(exponent) ||
-        exponent < 0 ||
-        exponent > 100
-      ) {
-        output.textContent = "Enter a valid base and an exponent from 0 to 100.";
-        return;
-      }
+        if (!data.schedule || !data.output) return;
 
-      const multiplication = exponent === 0
-        ? "1"
-        : Array(exponent).fill(base).join(" \\times ");
+        for (let hour = 0; hour < 24; hour++) {
+          if (!Array.isArray(data.schedule[hour])) {
+            data.schedule[hour] = [];
+          }
+        }
 
-      const result = base ** exponent;
+        displaySchedule(data);
 
-      output.textContent =
-        `\\(${base}^{${exponent}} = ${multiplication} = \\boxed{${result}}\\)`;
+        status.textContent =
+          `Restored saved schedule${data.fileName ? ": " + data.fileName : ""}.`;
 
-      if (window.MathJax?.typesetPromise) {
-        MathJax.typesetPromise([output]);
+      } catch {
+        status.textContent = "Could not restore saved schedule.";
       }
     }
 
-    convertPower();
+    function clearSavedSchedule() {
+      localStorage.removeItem(STORAGE_KEY);
+      output.textContent = "No schedule loaded.";
+      tableBody.replaceChildren();
+      status.textContent = "Saved schedule cleared.";
+    }
   </script>
-
 </body>
 </html>
