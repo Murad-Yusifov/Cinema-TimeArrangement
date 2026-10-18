@@ -37,13 +37,14 @@
       text-align: left;
     }
 
-    .room-time {
-      white-space: nowrap;
-      margin-right: 10px;
+    .session {
+      display: inline-block;
+      margin: 4px 12px 4px 0;
+      font-size: 20px;
     }
 
-    sup {
-      font-size: 0.7em;
+    .session sup {
+      font-size: 0.65em;
       vertical-align: super;
     }
   </style>
@@ -53,6 +54,7 @@
   <h2>Cinema Schedule Converter</h2>
 
   <input type="file" id="fileInput" accept=".xls,.xlsx">
+
   <button id="convertButton">Convert</button>
   <button id="copyButton">Copy Schedule</button>
   <button id="clearButton">Clear Saved Schedule</button>
@@ -62,20 +64,22 @@
   <h3>Converted Schedule</h3>
   <pre id="output">No schedule loaded.</pre>
 
-  <h3>Formatted Table</h3>
+  <h3>Visual Schedule</h3>
+
   <table>
     <thead>
       <tr>
         <th>Hour</th>
-        <th>Room and End Minute</th>
+        <th>Room Number with Ending Minute</th>
       </tr>
     </thead>
     <tbody id="tableBody"></tbody>
   </table>
 
   <script>
-    const STORAGE_KEY = "cinemaScheduleV2";
+    const STORAGE_KEY = "cinemaScheduleV4";
 
+    // Cinema room names and their numbers.
     const roomNumbers = {
       "platinum": 1,
       "coca-cola": 2,
@@ -85,7 +89,7 @@
       "dolby atmos": 9
     };
 
-    // Unicode superscript digits for plain-text output.
+    // Convert ordinary digits into superscript digits.
     const superscriptDigits = {
       "0": "⁰",
       "1": "¹",
@@ -111,6 +115,7 @@
     const tableBody = document.getElementById("tableBody");
     const status = document.getElementById("status");
 
+    // Display hours from 10 to 23, then 0 to 9.
     const hours = [
       ...Array.from({ length: 14 }, (_, i) => i + 10),
       ...Array.from({ length: 10 }, (_, i) => i)
@@ -125,7 +130,6 @@
     document.getElementById("clearButton")
       .addEventListener("click", clearSavedSchedule);
 
-    // Restore saved data when the page opens.
     restoreSchedule();
 
     function createEmptySchedule() {
@@ -146,6 +150,11 @@
         return;
       }
 
+      if (typeof XLSX === "undefined") {
+        status.textContent = "Excel library failed to load.";
+        return;
+      }
+
       try {
         const buffer = await file.arrayBuffer();
 
@@ -155,6 +164,7 @@
 
         const schedule = createEmptySchedule();
 
+        // Read all worksheets.
         for (const sheetName of workbook.SheetNames) {
           const sheet = workbook.Sheets[sheetName];
 
@@ -172,24 +182,25 @@
               String(value ?? "").trim()
             );
 
-            // Identify the cinema room.
+            // Find a room heading, for example:
+            // Зал: Mastercard
             const roomHeader = cells.find(cell =>
               /зал\s*:/i.test(cell)
             );
 
             if (roomHeader) {
-              const name = roomHeader
+              const roomName = roomHeader
                 .replace(/^.*?зал\s*:\s*/i, "")
                 .split(",")[0]
                 .trim()
                 .toLowerCase();
 
-              currentRoom = roomNumbers[name] ?? null;
+              currentRoom = roomNumbers[roomName] ?? null;
               endTimeColumn = -1;
               continue;
             }
 
-            // Find the session end-time column.
+            // Find the session ending-time column.
             const headerIndex = cells.findIndex(cell =>
               /конец\s+сеанса/i.test(cell)
             );
@@ -199,11 +210,14 @@
               continue;
             }
 
+            // Ignore unrecognized rooms and unrelated rows.
             if (currentRoom === null || endTimeColumn === -1) {
               continue;
             }
 
             const value = cells[endTimeColumn];
+
+            // Expected time format: HH:MM.
             const match = value.match(/^(\d{1,2}):(\d{2})$/);
 
             if (!match) continue;
@@ -220,17 +234,20 @@
           }
         }
 
-        // Sort sessions by ending minute.
+        // Sort sessions by ending minute, smallest first.
         for (const hour of Object.keys(schedule)) {
           schedule[hour].sort((a, b) =>
             a.minute - b.minute || a.room - b.room
           );
         }
 
+        // Example: 11-6⁰⁰-7¹⁵-9³⁰-3⁵⁵
         const lines = hours.map(hour => {
-          const entries = schedule[hour].map(item =>
-            `${toSuperscript(item.room)}${String(item.minute).padStart(2, "0")}`
-          );
+          const entries = schedule[hour].map(item => {
+            const minute = String(item.minute).padStart(2, "0");
+
+            return `${item.room}${toSuperscript(minute)}`;
+          });
 
           return `${hour}-${entries.join("-")}`;
         });
@@ -241,13 +258,15 @@
           fileName: file.name
         };
 
+        // Save the converted schedule in this browser.
         localStorage.setItem(
           STORAGE_KEY,
           JSON.stringify(savedData)
         );
 
         displaySchedule(savedData);
-        status.textContent = "Schedule converted and saved.";
+
+        status.textContent = `Schedule converted and saved: ${file.name}`;
 
       } catch (error) {
         status.textContent = "Error: " + error.message;
@@ -265,28 +284,35 @@
 
         hourCell.textContent = hour;
 
-       for (const item of data.schedule[hour]) {
-  const span = document.createElement("span");
-  span.className = "room-time fraction";
+        for (const item of data.schedule[hour]) {
+          const session = document.createElement("span");
+          session.className = "session";
 
-  const minute = document.createElement("span");
-  minute.className = "minute";
-  minute.textContent = String(item.minute).padStart(2, "0");
+          // Room number is the base.
+          session.appendChild(
+            document.createTextNode(String(item.room))
+          );
 
-  const room = document.createElement("span");
-  room.className = "room";
-  room.textContent = item.room;
+          // Ending minute is the superscript.
+          const sup = document.createElement("sup");
+          sup.textContent = String(item.minute).padStart(2, "0");
 
-  span.append(minute, room);
-  entriesCell.appendChild(span);
-}
+          session.appendChild(sup);
+          entriesCell.appendChild(session);
+        }
+
+        tr.append(hourCell, entriesCell);
+        tableBody.appendChild(tr);
+      }
+    }
+
     async function copyResult() {
       try {
         await navigator.clipboard.writeText(output.textContent);
         status.textContent = "Schedule copied.";
       } catch {
         status.textContent =
-          "Copy failed. Select the output and copy it manually.";
+          "Copy failed. Select the output text and copy it manually.";
       }
     }
 
@@ -318,8 +344,10 @@
 
     function clearSavedSchedule() {
       localStorage.removeItem(STORAGE_KEY);
+
       output.textContent = "No schedule loaded.";
       tableBody.replaceChildren();
+
       status.textContent = "Saved schedule cleared.";
     }
   </script>
