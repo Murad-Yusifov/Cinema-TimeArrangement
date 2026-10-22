@@ -1,714 +1,914 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cinema Schedule</title>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
   <style>
-    :root {
-      --blue: #2457d6;
-      --blue-dark: #173b99;
-      --background: #f4f6fa;
-      --surface: #fff;
-      --text: #172033;
-      --muted: #667085;
-      --border: #e2e7ef;
-      --green: #16804a;
-      --green-bg: #e8f7ee;
-      --orange: #b45c00;
-      --orange-bg: #fff2df;
-      --red: #b42318;
-      --gray-bg: #eef1f5;
-    }
     * { box-sizing: border-box; }
+
     body {
-      margin: 0; background: var(--background); color: var(--text);
-      font: 15px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f4f6fa;
+      color: #172033;
+      font: 15px/1.5 Arial, sans-serif;
     }
-    button, input { font: inherit; }
+
+    .app {
+      max-width: 950px;
+      margin: auto;
+    }
+
+    .panel {
+      margin-bottom: 16px;
+      padding: 18px;
+      border: 1px solid #e2e7ef;
+      border-radius: 14px;
+      background: white;
+    }
+
+    h1, h2 { margin-top: 0; }
+
+    h1 { font-size: 26px; }
+    h2 { font-size: 19px; }
+
+    .muted {
+      color: #667085;
+      font-size: 13px;
+    }
+
     button {
-      min-height: 42px; border: 0; border-radius: 11px; padding: 10px 14px;
-      font-weight: 700; cursor: pointer; touch-action: manipulation;
+      min-height: 42px;
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 9px;
+      cursor: pointer;
+      font-weight: bold;
     }
-    button:focus-visible, input:focus-visible { outline: 3px solid #86aaff; outline-offset: 2px; }
-    .app { width: min(100%, 980px); margin: auto; padding: 18px 16px 32px; }
-    .header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-    .brand-icon { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border-radius: 13px; background: var(--blue); color: #fff; font-size: 22px; }
-    h1 { margin: 0; font-size: clamp(20px, 4vw, 27px); line-height: 1.15; }
-    .subtitle { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
-    .clock-card { flex: 0 0 auto; padding: 7px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); text-align: center; }
-    .clock-label { color: var(--muted); font-size: 11px; }
-    #clock { font-size: 22px; line-height: 1.2; font-weight: 800; font-variant-numeric: tabular-nums; }
-    .panel { margin-bottom: 14px; padding: 18px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: 0 2px 8px #1d2c4608; }
-    .panel h2 { margin: 0 0 5px; font-size: 18px; }
-    .help-text { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
-    .upload-area { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px dashed #b9c6db; border-radius: 12px; background: #f9fbff; }
-    .upload-icon { font-size: 24px; }
-    .upload-details { flex: 1; min-width: 0; }
-    .upload-details strong { display: block; font-size: 14px; }
-    .upload-details span { display: block; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-    .button-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-    .primary { background: var(--blue); color: #fff; }
-    .primary:hover { background: var(--blue-dark); }
-    .secondary { border: 1px solid var(--border); background: #fff; color: var(--text); }
-    .danger { border: 1px solid #efc5c2; background: #fff; color: var(--red); }
-    button:disabled { cursor: not-allowed; opacity: .5; }
-    #message { margin: 12px 0 0; font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
-    .legend { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
-    .legend-item { display: flex; align-items: center; gap: 7px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 9px; background: #fff; font-size: 12px; font-weight: 650; }
-    .dot { width: 9px; height: 9px; flex-shrink: 0; border-radius: 50%; }
-    .dot-green { background: var(--green); } .dot-orange { background: #d97706; } .dot-gray { background: #7b8493; }
-    .schedule-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-    .schedule-heading h2 { margin: 0; font-size: 19px; }
-    #sessionCount { color: var(--muted); font-size: 12px; font-weight: 700; }
-    .hour-section { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 10px; padding: 13px 0; border-top: 1px solid var(--border); }
-    .hour-label { position: sticky; top: 8px; align-self: start; padding-top: 3px; font-size: 15px; font-weight: 850; white-space: nowrap; }
-    .room-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; }
-    .room-card { min-width: 0; padding: 11px; border: 1px solid var(--border); border-left: 4px solid #9aa3b2; border-radius: 11px; background: #fff; }
-    .room-card.status-green { border-left-color: var(--green); background: #fbfffc; }
-    .room-card.status-orange { border-left-color: #d97706; background: var(--orange-bg); }
-    .room-card.status-ended { border-left-color: #7b8493; background: #f5f6f8; }
-    .room-title { display: flex; align-items: baseline; gap: 7px; margin-bottom: 4px; }
-    .room-number { font-size: 27px; font-weight: 850; line-height: 1; font-variant-numeric: tabular-nums; }
-    .room-number sup { position: relative; top: -.15em; margin-left: 1px; font-size: 12px; font-weight: 800; }
-    .room-label { color: var(--muted); font-size: 11px; }
-    .status-text { margin-top: 7px; font-size: 13px; font-weight: 800; }
-    .status-green .status-text { color: var(--green); } .status-orange .status-text { color: var(--orange); } .status-ended .status-text { color: #5d6675; }
-    .empty-state { padding: 24px 14px; border: 1px dashed #bdc7d7; border-radius: 12px; color: var(--muted); text-align: center; font-size: 13px; }
-    .empty-state strong { display: block; margin-bottom: 5px; color: var(--text); font-size: 16px; }
-    .next-session-card { padding: 15px; border: 1px solid var(--green); border-radius: 12px; background: var(--green-bg); }
-    .next-session-card.status-orange { border-color: #d97706; background: var(--orange-bg); }
-    .next-session-main { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .next-session-room { font-size: 23px; font-weight: 850; }
-    .next-session-time { font-size: 14px; font-weight: 750; text-align: right; }
-    .next-session-countdown { margin-top: 8px; font-size: 18px; font-weight: 850; }
-    .next-session-card.status-green .next-session-countdown { color: var(--green); }
-    .next-session-card.status-orange .next-session-countdown { color: var(--orange); }
-    .plain-output { width: 100%; min-height: 76px; padding: 11px; border: 1px solid var(--border); border-radius: 10px; background: #f8faff; color: var(--text); font: 13px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
-    footer { padding: 8px; color: var(--muted); font-size: 11px; text-align: center; }
-    @media (max-width: 520px) {
-      .app { padding: 12px 10px 24px; }
-      .header { gap: 7px; }
-      .brand { gap: 8px; }
-      .brand-icon { width: 36px; height: 36px; border-radius: 10px; font-size: 19px; }
-      h1 { font-size: 19px; }
-      .subtitle { max-width: 175px; font-size: 11px; }
-      .clock-card { padding: 6px 8px; }
-      .clock-label { font-size: 10px; }
-      #clock { font-size: 19px; }
-      .panel { padding: 13px; margin-bottom: 10px; border-radius: 13px; }
-      .panel h2 { font-size: 16px; }
-      .upload-area { gap: 8px; padding: 9px; }
-      .upload-icon { display: none; }
-      .upload-details strong { font-size: 12px; }
-      .upload-details span { font-size: 10px; }
-      #chooseButton { min-height: 38px; padding: 8px 10px; font-size: 12px; }
-      .button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-      .button-row button { width: 100%; min-height: 40px; padding: 8px; font-size: 12px; }
-      #convertButton { grid-column: 1 / -1; }
-      .legend { gap: 5px; }
-      .legend-item { padding: 6px 7px; font-size: 10px; }
-      .hour-section { grid-template-columns: 47px minmax(0, 1fr); gap: 7px; padding: 10px 0; }
-      .hour-label { font-size: 12px; }
-      .room-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-      .room-card { padding: 8px; border-left-width: 3px; border-radius: 9px; }
-      .room-title { gap: 5px; }
-      .room-number { font-size: 23px; }
-      .room-number sup { font-size: 10px; }
-      .room-label { font-size: 10px; }
-      .status-text { margin-top: 5px; font-size: 11px; }
-      .next-session-main { align-items: flex-start; }
-      .next-session-room { font-size: 20px; }
-      .next-session-time { font-size: 12px; }
-      .next-session-countdown { font-size: 16px; }
-      .schedule-heading h2 { font-size: 17px; }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .5;
     }
-    @media (max-width: 350px) {
-      .room-list { grid-template-columns: 1fr; }
-      .hour-section { grid-template-columns: 43px minmax(0, 1fr); }
-      .subtitle { max-width: 130px; }
+
+    .primary {
+      background: #2457d6;
+      color: white;
+    }
+
+    .secondary {
+      border: 1px solid #dce2eb;
+      background: white;
+      color: #172033;
+    }
+
+    .danger {
+      border: 1px solid #efc5c2;
+      background: white;
+      color: #b42318;
+    }
+
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .file-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 12px;
+      border: 1px dashed #b9c6db;
+      border-radius: 10px;
+    }
+
+    #fileName {
+      flex: 1;
+      min-width: 150px;
+      overflow-wrap: anywhere;
+    }
+
+    #message {
+      margin-bottom: 0;
+      overflow-wrap: anywhere;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    #clock {
+      font-size: 25px;
+      font-weight: bold;
+    }
+
+    .hour-section {
+      display: grid;
+      grid-template-columns: 60px minmax(0, 1fr);
+      gap: 10px;
+      padding: 13px 0;
+      border-top: 1px solid #e2e7ef;
+    }
+
+    .hour-label {
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    .room-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 8px;
+    }
+
+    .room-card {
+      padding: 12px;
+      border: 1px solid #e2e7ef;
+      border-left: 4px solid #16804a;
+      border-radius: 10px;
+      background: #fbfffc;
+    }
+
+    .room-card.status-orange {
+      border-left-color: #d97706;
+      background: #fff2df;
+    }
+
+    .room-card.status-ended {
+      border-left-color: #7b8493;
+      background: #f5f6f8;
+    }
+
+    .room-number {
+      font-size: 26px;
+      font-weight: bold;
+    }
+
+    .room-number sup {
+      font-size: 12px;
+    }
+
+    .room-label {
+      color: #667085;
+      font-size: 12px;
+    }
+
+    .status-text {
+      margin-top: 7px;
+      font-weight: bold;
+    }
+
+    .status-orange .status-text { color: #b45c00; }
+    .status-ended .status-text { color: #5d6675; }
+
+    .next-card {
+      padding: 15px;
+      border: 1px solid #16804a;
+      border-radius: 10px;
+      background: #e8f7ee;
+    }
+
+    .next-card.warning {
+      border-color: #d97706;
+      background: #fff2df;
+    }
+
+    .empty {
+      padding: 22px;
+      border: 1px dashed #bdc7d7;
+      border-radius: 10px;
+      color: #667085;
+      text-align: center;
+    }
+
+    #textOutput {
+      width: 100%;
+      min-height: 80px;
+      padding: 12px;
+      border: 1px solid #e2e7ef;
+      border-radius: 9px;
+      background: #f8faff;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 500px) {
+      body { padding: 10px; }
+      .panel { padding: 13px; }
+      .hour-section {
+        grid-template-columns: 45px minmax(0, 1fr);
+        gap: 6px;
+      }
+      .room-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+      }
+      .room-card { padding: 8px; }
+      .room-number { font-size: 22px; }
     }
   </style>
 </head>
 
 <body>
-  <main class="app">
-    <header class="header">
-      <div class="brand">
-        <div class="brand-icon" aria-hidden="true">▣</div>
-        <div>
-          <h1>Cinema Schedule</h1>
-          <p class="subtitle">Session end times at a glance</p>
-        </div>
-      </div>
+<main class="app">
 
-      <div class="clock-card" aria-label="Current local time">
-        <div class="clock-label">Current time</div>
-        <div id="clock">--:--</div>
-      </div>
-    </header>
+  <section class="panel">
+    <h1>Cinema Schedule</h1>
+    <div class="muted">Current local time</div>
+    <div id="clock">--:--</div>
+  </section>
 
-    <section class="panel">
-      <h2>Schedule file</h2>
-      <p class="help-text">
-        Upload today's cinema Excel schedule.
-      </p>
+  <section class="panel">
+    <h2>Schedule file</h2>
+    <p class="muted">
+      Choose an Excel file to display it and optionally update the shared GitHub file.
+    </p>
 
-      <div class="upload-area">
-        <div class="upload-icon" aria-hidden="true">📄</div>
-        <div class="upload-details">
-          <strong>Excel schedule</strong>
-          <span id="fileName">No file selected (.xlsx or .xls)</span>
-        </div>
-        <button class="secondary" id="chooseButton" type="button">
-          Choose file
-        </button>
-        <input
-          id="excelFile"
-          type="file"
-          accept=".xlsx,.xls"
-          hidden
-        />
-      </div>
+    <div class="file-row">
+      <span id="fileName">No file selected (.xlsx or .xls)</span>
+      <button id="chooseButton" class="secondary" type="button">
+        Choose file
+      </button>
+      <input id="excelFile" type="file" accept=".xlsx,.xls" hidden>
+    </div>
 
-      <div class="button-row">
-        <button class="primary" id="convertButton" type="button">
-          Load schedule
-        </button>
-        <button class="secondary" id="copyButton" type="button" disabled>
-          Copy list
-        </button>
-        <button class="danger" id="clearButton" type="button">
-          Clear
-        </button>
-      </div>
+    <div class="buttons">
+      <button id="loadButton" class="primary" type="button">
+        Load schedule
+      </button>
+      <button id="copyButton" class="secondary" type="button" disabled>
+        Copy text
+      </button>
+      <button id="clearButton" class="danger" type="button">
+        Clear
+      </button>
+    </div>
 
-      <p id="message" role="status" aria-live="polite">
-        Upload a file to begin, or your saved schedule will appear automatically.
-      </p>
-    </section>
+    <p id="message" role="status">Connecting to GitHub...</p>
+  </section>
 
-    <section class="panel">
-      <h2>Status guide</h2>
-      <p class="help-text">
-        The room number is large. The small number above it shows the end minute.
-      </p>
+  <section class="panel">
+    <h2>Next session ending</h2>
+    <div id="nextSession" class="empty">
+      Loading schedule...
+    </div>
+  </section>
 
-      <div class="legend">
-        <div class="legend-item">
-          <span class="dot dot-green"></span>
-          5+ min left
-        </div>
-        <div class="legend-item">
-          <span class="dot dot-orange"></span>
-          Ending soon
-        </div>
-        <div class="legend-item">
-          <span class="dot dot-gray"></span>
-          Ended
-        </div>
-      </div>
-    </section>
+  <section class="panel">
+    <h2>Rooms by end time</h2>
+    <div id="sessionCount" class="muted">0 sessions</div>
+    <div id="scheduleView">
+      <div class="empty">Loading schedule...</div>
+    </div>
+  </section>
 
-    <section class="panel" id="nextSessionPanel" aria-live="polite">
-      <h2>Next session ending</h2>
-      <p class="help-text">The next session due to end is highlighted here. A warning appears when it is 5 minutes from ending.</p>
-      <div id="nextSessionView" class="empty-state">
-        <strong>No upcoming session</strong>
-        Upload your Excel schedule to see the next session ending.
-      </div>
-    </section>
+  <section class="panel">
+    <h2>Text list</h2>
+    <pre id="textOutput">No schedule available.</pre>
+  </section>
 
-    <section class="panel">
-      <div class="schedule-heading">
-        <h2>Rooms by end time</h2>
-        <span id="sessionCount">0 sessions</span>
-      </div>
+</main>
 
-      <div id="scheduleView">
-        <div class="empty-state">
-          <strong>No schedule loaded</strong>
-          Upload your Excel file and select “Load schedule”.
-        </div>
-      </div>
-    </section>
+<script>
+  // =====================================================
+  // GITHUB REPOSITORY CONFIGURATION
+  // =====================================================
 
-    <section class="panel">
-      <h2>Text list</h2>
-      <p class="help-text">
-        Copy this version if you need the schedule as plain text.
-      </p>
-      <pre id="textOutput" class="plain-output">No schedule available.</pre>
-    </section>
+  const OWNER = "Murad-Yusifov";
+  const REPOSITORY = "Cinema-TimeArrangement";
+  const BRANCH = "main";
+  const FILE_PATH = "Schedule.xlsx";
 
-    <footer>
-      Your schedule is saved in this browser. Keep this page open to see live updates.
-    </footer>
-  </main>
+  const GITHUB_API_URL =
+    `https://api.github.com/repos/${OWNER}/${REPOSITORY}/contents/${FILE_PATH}`;
 
-  <script>
-    const STORAGE_KEY = "cinemaScheduleV6";
-    const ROOM_NUMBERS = {
-      "platinum": 1,
-      "coca-cola": 2,
-      "coca cola": 2,
-      "badamli": 5,
-      "1664 blanc": 6,
-      "mastercard": 8,
-      "dolby atmos": 9
-    };
+  const GITHUB_RAW_URL =
+    `https://raw.githubusercontent.com/${OWNER}/${REPOSITORY}/${BRANCH}/${FILE_PATH}`;
 
-    const fileInput = document.getElementById("excelFile");
-    const fileName = document.getElementById("fileName");
-    const message = document.getElementById("message");
-    const scheduleView = document.getElementById("scheduleView");
-    const textOutput = document.getElementById("textOutput");
-    const sessionCount = document.getElementById("sessionCount");
-    const copyButton = document.getElementById("copyButton");
-    let currentSchedule = [];
+  // =====================================================
+  // ROOM NAMES
+  // =====================================================
 
-    document.getElementById("chooseButton").addEventListener("click", () => fileInput.click());
-    fileInput.addEventListener("change", () => {
-      fileName.textContent = fileInput.files[0]?.name || "No file selected (.xlsx or .xls)";
-    });
-    document.getElementById("convertButton").addEventListener("click", uploadAndConvertFile);
-    copyButton.addEventListener("click", copyText);
-    document.getElementById("clearButton").addEventListener("click", clearSchedule);
+  const ROOM_NUMBERS = {
+    "platinum": 1,
+    "coca-cola": 2,
+    "coca cola": 2,
+    "badamli": 5,
+    "1664 blanc": 6,
+    "mastercard": 8,
+    "dolby atmos": 9
+  };
 
-    function normalizeText(value) {
-      return String(value ?? "")
-        .replace(/\u00a0/g, " ")
-        .replace(/[\r\n\t]+/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .toLowerCase();
+  const STORAGE_KEY = "cinemaScheduleV6";
+
+  const fileInput = document.getElementById("excelFile");
+  const fileName = document.getElementById("fileName");
+  const message = document.getElementById("message");
+  const scheduleView = document.getElementById("scheduleView");
+  const sessionCount = document.getElementById("sessionCount");
+  const textOutput = document.getElementById("textOutput");
+  const copyButton = document.getElementById("copyButton");
+
+  let currentSchedule = [];
+
+  // =====================================================
+  // BUTTON EVENTS
+  // =====================================================
+
+  document.getElementById("chooseButton").addEventListener("click", () => {
+    fileInput.click();
+  });
+
+  fileInput.addEventListener("change", () => {
+    fileName.textContent =
+      fileInput.files[0]?.name || "No file selected (.xlsx or .xls)";
+  });
+
+  document.getElementById("loadButton").addEventListener("click", handleLoadSchedule);
+  copyButton.addEventListener("click", copyText);
+  document.getElementById("clearButton").addEventListener("click", clearSchedule);
+
+  // =====================================================
+  // HELPERS
+  // =====================================================
+
+  function showMessage(text, isError = false) {
+    message.textContent = text;
+    message.style.color = isError ? "#b42318" : "#16804a";
+  }
+
+  function normalizeText(value) {
+    return String(value ?? "")
+      .replace(/\u00a0/g, " ")
+      .replace(/[\r\n\t]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+
+  function getRoomNumber(name) {
+    const roomLabel = normalizeText(name)
+      .replace(/^зал\s*:\s*/, "")
+      .split(",")[0]
+      .trim();
+
+    for (const [name, number] of Object.entries(ROOM_NUMBERS)) {
+      if (roomLabel.includes(name)) return number;
     }
 
-    function getRoomNumber(name) {
-      // Example headings:
-      // "1664 Blanc, мест: 65" -> Room 6 (65 is the seat count)
-      // "Platinum, мест: 32"   -> Room 1 (32 is the seat count)
-      // "3, мест: 129"         -> Room 3
-      const normalized = normalizeText(name)
-        .replace(/^зал\s*:\s*/, "")
-        .trim();
+    const numeric = roomLabel.match(/^(?:зал\s*)?(?:№\s*)?(\d{1,2})$/i);
 
-      // Only the text before the first comma identifies the room.
-      // The text after the comma usually contains the number of seats.
-      const roomLabel = normalized.split(",")[0].trim();
+    return numeric ? Number(numeric[1]) : null;
+  }
 
-      // Check named rooms FIRST so digits in names or seat counts
-      // can never be mistaken for the room number.
-      for (const [roomName, roomNumber] of Object.entries(ROOM_NUMBERS)) {
-        if (roomLabel.includes(roomName)) return roomNumber;
-      }
-
-      // Numeric rooms such as "3", "4", or "7".
-      const numeric = roomLabel.match(/^(?:зал\s*)?(?:№\s*)?(\d{1,2})$/i);
-      if (numeric) return Number(numeric[1]);
-
+  function parseTime(value) {
+    if (value === null || value === undefined || value === "") {
       return null;
     }
 
-    function parseTime(value) {
-      if (value === null || value === undefined || value === "") return null;
+    // Excel time value.
+    if (typeof value === "number" && Number.isFinite(value)) {
+      const minutes = Math.round((((value % 1) + 1) % 1) * 1440) % 1440;
 
-      // Excel stores times as fractions of a day. If a date is included, use only its time fraction.
-      if (typeof value === "number" && Number.isFinite(value)) {
-        const totalMinutes = Math.round(((value % 1) + 1) % 1 * 1440) % 1440;
-        return { hour: Math.floor(totalMinutes / 60), minute: totalMinutes % 60 };
-      }
-
-      if (value instanceof Date && !Number.isNaN(value.getTime())) {
-        // Read UTC parts to avoid local time-zone shifting by the browser.
-        return { hour: value.getUTCHours(), minute: value.getUTCMinutes() };
-      }
-
-      const text = String(value).trim();
-      // Accept HH:mm, H:mm, HH:mm:ss and strings containing a date before the time.
-      const match = text.match(/(?:^|\s)(\d{1,2}):(\d{2})(?::\d{2}(?:[.,]\d+)?)?(?:\s|$)/) ||
-                    text.match(/^(\d{1,2}):(\d{2})(?::\d{2}(?:[.,]\d+)?)?$/);
-      if (!match) return null;
-      const hour = Number(match[1]);
-      const minute = Number(match[2]);
-      if (hour > 23 || minute > 59) return null;
-      return { hour, minute };
+      return {
+        hour: Math.floor(minutes / 60),
+        minute: minutes % 60
+      };
     }
 
-    function isEndHeader(value) {
-      const text = normalizeText(value).replace(/[ё]/g, "е");
-      return /конец\s*(?:времени\s*)?сеанса/.test(text) ||
-             /окончание\s*сеанса/.test(text) ||
-             /session\s*end/.test(text);
-    }
+    const text = String(value).trim();
 
-    async function uploadAndConvertFile() {
-  const file = fileInput.files[0];
-
-  if (!file) {
-    showMessage("Please choose an Excel file first.", true);
-    return;
-  }
-
-  // Convert and validate the Excel file first.
-  const converted = await convertFile(file);
-  if (converted !== true) return;
-
-  const token = prompt("Enter your GitHub Personal Access Token:");
-  if (!token) {
-    showMessage("Upload cancelled. The schedule is displayed locally.");
-    return;
-  }
-
-  const apiUrl =
-    "https://api.github.com/repos/Murad-Yusifov/Cinema-TimeArrangement/contents/Schedule.xlsx";
-
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28"
-  };
-
-  try {
-    // Get the existing file SHA.
-    const currentResponse = await fetch(
-      `${apiUrl}?ref=main`,
-      { headers }
+    const match = text.match(
+      /(?:^|\s)(\d{1,2}):(\d{2})(?::\d{2}(?:[.,]\d+)?)?(?:\s|$)/
+    ) || text.match(
+      /^(\d{1,2}):(\d{2})(?::\d{2}(?:[.,]\d+)?)?$/
     );
 
-    if (!currentResponse.ok) {
-      throw new Error("Could not retrieve the existing GitHub file.");
-    }
+    if (!match) return null;
 
-    const currentFile = await currentResponse.json();
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
 
-    // Convert the selected Excel file to Base64.
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    let binary = "";
+    if (hour > 23 || minute > 59) return null;
 
-    for (let i = 0; i < bytes.length; i += 32768) {
-      binary += String.fromCharCode(
-        ...bytes.subarray(i, i + 32768)
-      );
-    }
-
-    const content = btoa(binary);
-
-    // Replace the online Excel file.
-    const updateResponse = await fetch(apiUrl, {
-      method: "PUT",
-      headers: {
-        ...headers,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        message: "Update cinema schedule",
-        content,
-        sha: currentFile.sha,
-        branch: "main"
-      })
-    });
-
-    if (!updateResponse.ok) {
-      throw new Error(await updateResponse.text());
-    }
-
-    showMessage("Schedule converted and uploaded to GitHub successfully.");
-  } catch (error) {
-    console.error(error);
-    showMessage(`GitHub update failed: ${error.message}`, true);
-  }
-}
-    async function uploadAndConvertFile() {
-  const file = fileInput.files[0];
-
-  if (!file) {
-    showMessage("Please choose an Excel file first.", true);
-    return;
+    return { hour, minute };
   }
 
-  // Convert and validate the Excel file first.
-  const converted = await convertFile(file);
-  if (converted !== true) return;
+  function isEndHeader(value) {
+    const text = normalizeText(value).replace(/[ё]/g, "е");
 
-  const token = prompt("Enter your GitHub Personal Access Token:");
-  if (!token) {
-    showMessage("Upload cancelled. The schedule is displayed locally.");
-    return;
+    return /конец\s*(?:времени\s*)?сеанса/.test(text) ||
+           /окончание\s*сеанса/.test(text) ||
+           /session\s*end/.test(text);
   }
 
-  const apiUrl =
-    "https://api.github.com/repos/Murad-Yusifov/Cinema-TimeArrangement/contents/Schedule.xlsx";
+  // =====================================================
+  // READ AND CONVERT EXCEL
+  // =====================================================
 
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28"
-  };
-
-  try {
-    // Get the existing file SHA.
-    const currentResponse = await fetch(
-      `${apiUrl}?ref=main`,
-      { headers }
-    );
-
-    if (!currentResponse.ok) {
-      throw new Error("Could not retrieve the existing GitHub file.");
+  async function convertFile(file) {
+    if (!file) {
+      showMessage("Choose an Excel file first.", true);
+      return false;
     }
 
-    const currentFile = await currentResponse.json();
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sessions = [];
+      const skippedRooms = new Set();
 
-    // Convert the selected Excel file to Base64.
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    let binary = "";
-
-    for (let i = 0; i < bytes.length; i += 32768) {
-      binary += String.fromCharCode(
-        ...bytes.subarray(i, i + 32768)
-      );
-    }
-
-    const content = btoa(binary);
-
-    // Replace the online Excel file.
-    const updateResponse = await fetch(apiUrl, {
-      method: "PUT",
-      headers: {
-        ...headers,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        message: "Update cinema schedule",
-        content,
-        sha: currentFile.sha,
-        branch: "main"
-      })
-    });
-
-    if (!updateResponse.ok) {
-      throw new Error(await updateResponse.text());
-    }
-
-    showMessage("Schedule converted and uploaded to GitHub successfully.");
-  } catch (error) {
-    console.error(error);
-    showMessage(`GitHub update failed: ${error.message}`, true);
-  }
-}
-    async function convertFile() {
-      const file = fileInput.files[0];
-      if (!file) return showMessage("Please choose an Excel file first.", true);
-      if (typeof XLSX === "undefined") return showMessage("Excel reader could not load. Check your internet connection and refresh.", true);
-
-      try {
-        const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: "array", cellDates: false });
-        const sessions = [];
-        const skippedRooms = new Set();
-        const skippedTimes = [];
-
-        for (const sheetName of workbook.SheetNames) {
-          const sheet = workbook.Sheets[sheetName];
-          const rows = XLSX.utils.sheet_to_json(sheet, {
+      for (const sheetName of workbook.SheetNames) {
+        const rows = XLSX.utils.sheet_to_json(
+          workbook.Sheets[sheetName],
+          {
             header: 1,
             defval: "",
             raw: true,
             blankrows: false
-          });
-          let roomNumber = null;
-          let endColumn = -1;
+          }
+        );
 
-          for (const row of rows) {
-            // First find a room heading anywhere in the row.
-            for (const cell of row) {
-              const text = String(cell ?? "").trim();
-              const roomMatch = text.match(/зал\s*:\s*(.+)/i);
-              if (roomMatch) {
-                roomNumber = getRoomNumber(roomMatch[1]);
-                if (roomNumber === null) skippedRooms.add(roomMatch[1]);
+        let roomNumber = null;
+        let endColumn = -1;
+
+        for (const row of rows) {
+          // Find a room heading.
+          for (const cell of row) {
+            const text = String(cell ?? "").trim();
+            const match = text.match(/зал\s*:\s*(.+)/i);
+
+            if (match) {
+              roomNumber = getRoomNumber(match[1]);
+
+              if (roomNumber === null) {
+                skippedRooms.add(match[1]);
               }
             }
+          }
 
-            // Header may be written with different spaces or line breaks.
-            const headerIndex = row.findIndex(isEndHeader);
-            if (headerIndex !== -1) {
-              endColumn = headerIndex;
-              continue;
-            }
-            if (roomNumber === null || endColumn === -1) continue;
+          // Find the session-end column.
+          const headerIndex = row.findIndex(isEndHeader);
 
-            const time = parseTime(row[endColumn]);
-            if (!time) {
-              const candidate = row[endColumn];
-              if (candidate !== "" && candidate != null) skippedTimes.push(String(candidate));
-              continue;
-            }
-            sessions.push({ hour: time.hour, minute: time.minute, room: roomNumber });
+          if (headerIndex !== -1) {
+            endColumn = headerIndex;
+            continue;
+          }
+
+          if (roomNumber === null || endColumn === -1) continue;
+
+          const time = parseTime(row[endColumn]);
+
+          if (time) {
+            sessions.push({
+              hour: time.hour,
+              minute: time.minute,
+              room: roomNumber
+            });
           }
         }
-
-        if (!sessions.length) {
-          showMessage("No sessions found. Check the room headings and the 'Конец сеанса' column.", true);
-          console.warn("Excel workbook:", workbook);
-          return;
-        }
-
-        // Keep duplicate sessions if the source contains them; sort chronologically.
-        currentSchedule = sessions.sort((a, b) => a.hour - b.hour || a.minute - b.minute || a.room - b.room);
-        renderSchedule();
-        saveSchedule();
-        let status = `Converted ${sessions.length} sessions from ${workbook.SheetNames.length} sheet(s).`;
-        if (skippedRooms.size) status += ` Unrecognized rooms: ${[...skippedRooms].join(", ")}.`;
-        if (skippedTimes.length) status += ` Some cells were skipped because their time could not be read (${skippedTimes.slice(0, 3).join(", ")}).`;
-        showMessage(status, skippedRooms.size > 0 || skippedTimes.length > 0);
-      } catch (error) {
-        console.error(error);
-        showMessage(`Could not read this Excel file: ${error.message}`, true);
       }
-    }
 
-    // Treat a session as the next occurrence of its clock time.
-    // If it is already past today, its next occurrence is tomorrow.
-    function getSessionEndDateTime(session, now = new Date()) {
-      const target = new Date(now);
-      target.setHours(session.hour, session.minute, 0, 0);
-      if (target.getTime() <= now.getTime()) target.setDate(target.getDate() + 1);
-      return target;
-    }
-
-    function getStatus(session, now = new Date()) {
-      const target = getSessionEndDateTime(session, now);
-      const minutesRemaining = Math.ceil((target.getTime() - now.getTime()) / 60000);
-      if (minutesRemaining <= 0) return { type: "ended", label: "ENDED" };
-      if (minutesRemaining <= 5) return { type: "orange", label: `⚠ ${minutesRemaining} min left` };
-      return { type: "green", label: `${minutesRemaining} min left` };
-    }
-
-    function renderNextSession(now = new Date()) {
-      const view = document.getElementById("nextSessionView");
-      const upcoming = currentSchedule
-        .map(session => ({ ...session, endDateTime: getSessionEndDateTime(session, now) }))
-        .sort((a, b) => a.endDateTime - b.endDateTime || a.room - b.room);
-      if (!upcoming.length) {
-        view.className = "empty-state";
-        view.innerHTML = "<strong>No upcoming session</strong>Upload your Excel schedule to see the next session ending.";
-        return;
+      if (!sessions.length) {
+        showMessage(
+          "No sessions found. Check the room headings and session-end column.",
+          true
+        );
+        return false;
       }
-      const next = upcoming[0];
-      const minutes = Math.ceil((next.endDateTime.getTime() - now.getTime()) / 60000);
-      const warning = minutes <= 5;
-      view.className = `next-session-card ${warning ? "status-orange" : "status-green"}`;
-      view.innerHTML = `
-        <div class="next-session-main">
-          <div><div class="next-session-room">Room ${next.room}</div><div class="room-label">Next session to end</div></div>
-          <div class="next-session-time">Ends at ${String(next.hour).padStart(2, "0")}:${String(next.minute).padStart(2, "0")}</div>
-        </div>
-        <div class="next-session-countdown">${warning ? "⚠ Ending" : "Ends"} in ${minutes} minute${minutes === 1 ? "" : "s"}</div>`;
-    }
 
-    function superscriptDigits(value) {
-      const map = { "0":"⁰", "1":"¹", "2":"²", "3":"³", "4":"⁴", "5":"⁵", "6":"⁶", "7":"⁷", "8":"⁸", "9":"⁹" };
-      return String(value).padStart(2, "0").split("").map(digit => map[digit]).join("");
-    }
+      currentSchedule = sessions.sort(
+        (a, b) =>
+          a.hour - b.hour ||
+          a.minute - b.minute ||
+          a.room - b.room
+      );
 
-    function formatHour(hour) { return `${String(hour).padStart(2, "0")}:00`; }
-
-    function renderSchedule() {
-      if (!currentSchedule.length) {
-        scheduleView.innerHTML = '<div class="empty-state"><strong>No schedule loaded</strong>Upload an Excel file to display sessions.</div>';
-        textOutput.textContent = "No schedule available.";
-        sessionCount.textContent = "0 sessions";
-        copyButton.disabled = true;
-        renderNextSession();
-        return;
-      }
-      const grouped = {};
-      for (const session of currentSchedule) {
-        if (!grouped[session.hour]) grouped[session.hour] = [];
-        grouped[session.hour].push(session);
-      }
-      const hours = Object.keys(grouped).map(Number).sort((a, b) => a - b);
-      scheduleView.innerHTML = hours.map(hour => {
-        const cards = grouped[hour].map(session => `
-          <article class="room-card" data-hour="${session.hour}" data-minute="${session.minute}" data-room="${session.room}">
-            <div class="room-title"><span class="room-number">${session.room}<sup>${String(session.minute).padStart(2, "0")}</sup></span><span class="room-label">Room ${session.room}</span></div>
-            <div class="room-label">Session ends at ${String(session.hour).padStart(2, "0")}:${String(session.minute).padStart(2, "0")}</div>
-            <div class="status-text" aria-live="off">Checking time…</div>
-          </article>`).join("");
-        return `<section class="hour-section"><div class="hour-label">${formatHour(hour)}</div><div class="room-list">${cards}</div></section>`;
-      }).join("");
-      textOutput.textContent = hours.map(hour => {
-        const items = [...grouped[hour]].sort((a, b) => a.minute - b.minute || a.room - b.room)
-          .map(session => `${session.room}${superscriptDigits(session.minute)}`);
-        return `${hour}-${items.join("-")}`;
-      }).join("\n");
-      sessionCount.textContent = `${currentSchedule.length} sessions`;
-      copyButton.disabled = false;
-      updateCountdowns();
-    }
-
-    function updateCountdowns() {
-      const now = new Date();
-      document.getElementById("clock").textContent = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-      renderNextSession(now);
-      document.querySelectorAll(".room-card").forEach(card => {
-        const session = { hour: Number(card.dataset.hour), minute: Number(card.dataset.minute), room: Number(card.dataset.room) };
-        const status = getStatus(session, now);
-        card.classList.remove("status-green", "status-orange", "status-ended");
-        card.classList.add(status.type === "ended" ? "status-ended" : status.type === "orange" ? "status-orange" : "status-green");
-        card.querySelector(".status-text").textContent = status.label;
-      });
-    }
-
-    function saveSchedule() {
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(currentSchedule)); }
-      catch { showMessage("Schedule displayed, but the browser could not save it.", true); }
-    }
-
-    function loadSchedule() {
-      try {
-        const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-        if (!Array.isArray(parsed)) return;
-        currentSchedule = parsed.filter(s => Number.isInteger(s.hour) && s.hour >= 0 && s.hour <= 23 && Number.isInteger(s.minute) && s.minute >= 0 && s.minute <= 59 && Number.isInteger(s.room));
-        if (currentSchedule.length) { renderSchedule(); showMessage("Your saved schedule has been restored."); }
-      } catch { showMessage("The saved schedule could not be loaded. Please upload the Excel file again.", true); }
-    }
-
-    async function copyText() {
-      try { await navigator.clipboard.writeText(textOutput.textContent); showMessage("Schedule text copied."); }
-      catch {
-        const range = document.createRange(); range.selectNodeContents(textOutput);
-        const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
-        showMessage("Select the highlighted text and copy it.");
-      }
-    }
-
-    function clearSchedule() {
-      if (!confirm("Clear the saved schedule? You will need to upload the Excel file again.")) return;
-      currentSchedule = [];
-      localStorage.removeItem(STORAGE_KEY);
-      // Also clear schedules saved by the previous version.
-      localStorage.removeItem("cinemaScheduleV5");
-      fileInput.value = "";
-      fileName.textContent = "No file selected (.xlsx or .xls)";
       renderSchedule();
-      showMessage("Schedule cleared.");
+      saveSchedule();
+
+      let result = `Loaded ${sessions.length} sessions.`;
+
+      if (skippedRooms.size) {
+        result += ` Unrecognized rooms: ${[...skippedRooms].join(", ")}.`;
+      }
+
+      showMessage(result, skippedRooms.size > 0);
+      return true;
+
+    } catch (error) {
+      console.error(error);
+      showMessage(`Could not read Excel file: ${error.message}`, true);
+      return false;
+    }
+  }
+
+  // =====================================================
+  // LOAD OR UPDATE THE SHARED GITHUB FILE
+  // =====================================================
+
+  async function handleLoadSchedule() {
+    const file = fileInput.files[0];
+
+    // No file selected means load the existing public GitHub file.
+    if (!file) {
+      await loadGitHubSchedule();
+      return;
     }
 
-    function showMessage(text, isError = false) {
-      message.textContent = text;
-      message.style.color = isError ? "var(--red)" : "var(--green)";
+    // First display the selected file locally.
+    const converted = await convertFile(file);
+
+    if (!converted) return;
+
+    // Ask for the token only when the user has selected a file.
+    const token = "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"
+
+    if (!token || !token.trim()) {
+      showMessage("Schedule displayed locally. GitHub was not changed.");
+      return;
     }
 
-    loadSchedule();
+    await uploadExcelToGitHub(file, token.trim());
+  }
+
+  async function loadGitHubSchedule() {
+    showMessage("Loading the latest schedule from GitHub...");
+
+    try {
+      const response = await fetch(
+        `${GITHUB_RAW_URL}?t=${Date.now()}`,
+        { cache: "no-store" }
+      );
+
+      if (!response.ok) {
+        throw new Error(`GitHub returned HTTP ${response.status}.`);
+      }
+
+      const blob = await response.blob();
+
+      const onlineFile = new File([blob], FILE_PATH, {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      });
+
+      const converted = await convertFile(onlineFile);
+
+      if (converted) {
+        showMessage("Latest shared schedule loaded from GitHub.");
+      }
+
+    } catch (error) {
+      console.error(error);
+      showMessage(`Could not load GitHub schedule: ${error.message}`, true);
+    }
+  }
+
+  async function uploadExcelToGitHub(file, token) {
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28"
+    };
+
+    try {
+      showMessage("Checking the current GitHub file...");
+
+      // GitHub requires the current file's SHA when updating it.
+      const currentResponse = await fetch(
+        `${GITHUB_API_URL}?ref=${BRANCH}`,
+        { headers }
+      );
+
+      if (!currentResponse.ok) {
+        const detail = await currentResponse.text();
+
+        throw new Error(
+          `Could not read existing file (${currentResponse.status}). ${detail}`
+        );
+      }
+
+      const currentFile = await currentResponse.json();
+
+      showMessage("Uploading the Excel file to GitHub...");
+
+      // Convert the Excel file bytes to Base64.
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = "";
+      const chunkSize = 0x8000;
+
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(
+          ...bytes.subarray(i, i + chunkSize)
+        );
+      }
+
+      const content = btoa(binary);
+
+      // Update Schedule.xlsx in the repository.
+      const updateResponse = await fetch(GITHUB_API_URL, {
+        method: "PUT",
+        headers: {
+          ...headers,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: "Update cinema schedule",
+          content,
+          sha: currentFile.sha,
+          branch: BRANCH
+        })
+      });
+
+      if (!updateResponse.ok) {
+        const detail = await updateResponse.text();
+
+        throw new Error(
+          `GitHub update failed (${updateResponse.status}). ${detail}`
+        );
+      }
+
+      showMessage(
+        "Success! Schedule.xlsx was updated on GitHub. Other visitors can load the new version."
+      );
+
+    } catch (error) {
+      console.error(error);
+      showMessage(`GitHub upload failed: ${error.message}`, true);
+    }
+  }
+
+  // =====================================================
+  // COUNTDOWN AND SCHEDULE DISPLAY
+  // =====================================================
+
+  function getSessionEndDateTime(session, now = new Date()) {
+    const target = new Date(now);
+
+    target.setHours(session.hour, session.minute, 0, 0);
+
+    // If the time has passed today, use its next occurrence tomorrow.
+    if (target.getTime() <= now.getTime()) {
+      target.setDate(target.getDate() + 1);
+    }
+
+    return target;
+  }
+
+  function getStatus(session, now = new Date()) {
+    const target = getSessionEndDateTime(session, now);
+    const minutes = Math.ceil((target - now) / 60000);
+
+    if (minutes <= 0) {
+      return { type: "ended", label: "ENDED" };
+    }
+
+    if (minutes <= 5) {
+      return { type: "orange", label: `⚠ ${minutes} min left` };
+    }
+
+    return { type: "green", label: `${minutes} min left` };
+  }
+
+  function renderNextSession(now = new Date()) {
+    const view = document.getElementById("nextSession");
+
+    const upcoming = currentSchedule
+      .map(session => ({
+        ...session,
+        endDateTime: getSessionEndDateTime(session, now)
+      }))
+      .sort((a, b) =>
+        a.endDateTime - b.endDateTime || a.room - b.room
+      );
+
+    if (!upcoming.length) {
+      view.className = "empty";
+      view.textContent = "No upcoming session.";
+      return;
+    }
+
+    const next = upcoming[0];
+    const minutes = Math.ceil((next.endDateTime - now) / 60000);
+    const warning = minutes <= 5;
+
+    view.className = `next-card ${warning ? "warning" : ""}`;
+
+    view.innerHTML = `
+      <strong>Room ${next.room}</strong>
+      <div>Session ends at ${
+        String(next.hour).padStart(2, "0")
+      }:${String(next.minute).padStart(2, "0")}</div>
+      <div style="margin-top:8px;font-weight:bold">
+        ${warning ? "⚠ Ending" : "Ends"} in ${minutes}
+        minute${minutes === 1 ? "" : "s"}
+      </div>
+    `;
+  }
+
+  function superscriptDigits(value) {
+    const digits = {
+      "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
+      "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹"
+    };
+
+    return String(value)
+      .padStart(2, "0")
+      .split("")
+      .map(digit => digits[digit])
+      .join("");
+  }
+
+  function renderSchedule() {
+    if (!currentSchedule.length) {
+      scheduleView.innerHTML =
+        '<div class="empty">No schedule loaded.</div>';
+
+      textOutput.textContent = "No schedule available.";
+      sessionCount.textContent = "0 sessions";
+      copyButton.disabled = true;
+      renderNextSession();
+      return;
+    }
+
+    const grouped = {};
+
+    for (const session of currentSchedule) {
+      if (!grouped[session.hour]) grouped[session.hour] = [];
+      grouped[session.hour].push(session);
+    }
+
+    const hours = Object.keys(grouped)
+      .map(Number)
+      .sort((a, b) => a - b);
+
+    scheduleView.innerHTML = hours.map(hour => {
+      const cards = grouped[hour].map(session => `
+        <article class="room-card"
+          data-hour="${session.hour}"
+          data-minute="${session.minute}"
+          data-room="${session.room}">
+
+          <div class="room-number">
+            ${session.room}<sup>${String(session.minute).padStart(2, "0")}</sup>
+          </div>
+
+          <div class="room-label">
+            Room ${session.room}
+          </div>
+
+          <div class="room-label">
+            Session ends at ${
+              String(session.hour).padStart(2, "0")
+            }:${String(session.minute).padStart(2, "0")}
+          </div>
+
+          <div class="status-text">Checking time...</div>
+        </article>
+      `).join("");
+
+      return `
+        <section class="hour-section">
+          <div class="hour-label">
+            ${String(hour).padStart(2, "0")}:00
+          </div>
+          <div class="room-list">${cards}</div>
+        </section>
+      `;
+    }).join("");
+
+    textOutput.textContent = hours.map(hour => {
+      const items = [...grouped[hour]]
+        .sort((a, b) => a.minute - b.minute || a.room - b.room)
+        .map(session =>
+          `${session.room}${superscriptDigits(session.minute)}`
+        );
+
+      return `${hour}-${items.join("-")}`;
+    }).join("\n");
+
+    sessionCount.textContent = `${currentSchedule.length} sessions`;
+    copyButton.disabled = false;
+
     updateCountdowns();
-    setInterval(updateCountdowns, 1000);
-  </script>
+  }
+
+  function updateCountdowns() {
+    const now = new Date();
+
+    document.getElementById("clock").textContent =
+      now.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      });
+
+    renderNextSession(now);
+
+    document.querySelectorAll(".room-card").forEach(card => {
+      const session = {
+        hour: Number(card.dataset.hour),
+        minute: Number(card.dataset.minute),
+        room: Number(card.dataset.room)
+      };
+
+      const status = getStatus(session, now);
+
+      card.classList.remove(
+        "status-green",
+        "status-orange",
+        "status-ended"
+      );
+
+      card.classList.add(
+        status.type === "orange"
+          ? "status-orange"
+          : status.type === "ended"
+            ? "status-ended"
+            : "status-green"
+      );
+
+      card.querySelector(".status-text").textContent = status.label;
+    });
+  }
+
+  // =====================================================
+  // LOCAL STORAGE, COPY AND CLEAR
+  // =====================================================
+
+  function saveSchedule() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(currentSchedule));
+    } catch {
+      showMessage("Schedule displayed, but local saving failed.", true);
+    }
+  }
+
+  function loadSavedSchedule() {
+    try {
+      const parsed = JSON.parse(
+        localStorage.getItem(STORAGE_KEY) || "null"
+      );
+
+      if (!Array.isArray(parsed)) return;
+
+      currentSchedule = parsed.filter(session =>
+        Number.isInteger(session.hour) &&
+        session.hour >= 0 &&
+        session.hour <= 23 &&
+        Number.isInteger(session.minute) &&
+        session.minute >= 0 &&
+        session.minute <= 59 &&
+        Number.isInteger(session.room)
+      );
+
+      if (currentSchedule.length) renderSchedule();
+
+    } catch (error) {
+      console.error("Could not restore saved schedule:", error);
+    }
+  }
+
+  async function copyText() {
+    try {
+      await navigator.clipboard.writeText(textOutput.textContent);
+      showMessage("Schedule text copied.");
+    } catch {
+      showMessage(
+        "Automatic copying failed. Select the text and copy it manually.",
+        true
+      );
+    }
+  }
+
+  function clearSchedule() {
+    if (!confirm("Clear the locally saved schedule?")) return;
+
+    currentSchedule = [];
+    localStorage.removeItem(STORAGE_KEY);
+
+    fileInput.value = "";
+    fileName.textContent = "No file selected (.xlsx or .xls)";
+
+    renderSchedule();
+    showMessage("Local schedule cleared. GitHub was not changed.");
+  }
+
+  // =====================================================
+  // START
+  // =====================================================
+
+  loadSavedSchedule();
+  updateCountdowns();
+  setInterval(updateCountdowns, 1000);
+
+  // Load the shared repository schedule on page startup.
+  loadGitHubSchedule();
+</script>
+
 </body>
 </html>
